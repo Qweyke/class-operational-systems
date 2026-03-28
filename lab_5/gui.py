@@ -1,5 +1,4 @@
 import sys
-import os
 import struct
 from PySide6.QtWidgets import (
     QApplication,
@@ -94,7 +93,6 @@ class FSGui(QMainWindow):
         if "|" not in raw_text or "---" in raw_text:
             return
 
-        # Важно: в update_list ты выводишь "DIR", а не "[DIR]"
         name = raw_text.split("|")[0].strip()
         is_dir = "DIR" in raw_text.split("|")[1]
 
@@ -106,7 +104,6 @@ class FSGui(QMainWindow):
                 header = f.read(8)
                 _, bitmap_size = struct.unpack("<II", header)
 
-                # Ищем папку в текущей таблице
                 f.seek(8 + bitmap_size + self.current_dir_offset)
                 for _ in range(MAX_FILES):
                     data = f.read(ENTRY_SIZE)
@@ -114,7 +111,6 @@ class FSGui(QMainWindow):
                         f"<BB{NAME_SIZE}sII", data
                     )
                     if is_used and e_name.decode("ascii").strip("\x00") == name:
-                        # Смещение = Таблица Root (416 байт) + Начало в Data Area
                         self.current_dir_offset = (MAX_FILES * ENTRY_SIZE) + start
                         self.update_list()
                         return
@@ -136,7 +132,6 @@ class FSGui(QMainWindow):
     def handle_import(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Import File")
         if file_path:
-            # ПЕРЕДАЕМ self.current_dir_offset
             if self.fs.copy_in(file_path, target_offset=self.current_dir_offset):
                 self.update_list()
             else:
@@ -149,7 +144,6 @@ class FSGui(QMainWindow):
         if filename and not is_dir:
             save_path, _ = QFileDialog.getSaveFileName(self, "Export File", filename)
             if save_path:
-                # ПЕРЕДАЕМ ОФФСЕТ ТУТ:
                 if self.fs.copy_out(
                     filename, save_path, offset=self.current_dir_offset
                 ):
@@ -167,7 +161,6 @@ class FSGui(QMainWindow):
             return None, None
         parts = item.text().split("|")
         name = parts[0].strip()
-        # Исправлено: ищем "DIR", так как скобок [] в списке нет
         is_dir = "DIR" in parts[1]
         return name, is_dir
 
@@ -239,7 +232,10 @@ class FSGui(QMainWindow):
     def handle_delete_file(self):
         name, is_dir = self.get_selection()
         if name and not is_dir:
-            if QMessageBox.question(self, "Delete", "Sure?") == QMessageBox.Yes:
+            if (
+                QMessageBox.question(self, "Delete", "Sure?")
+                == QMessageBox.StandardButton.Yes
+            ):
                 self.fs.delete_file(name, offset=self.current_dir_offset)
                 self.update_list()
 
@@ -247,8 +243,10 @@ class FSGui(QMainWindow):
         name, is_dir = self.get_selection()
         if name and is_dir:
             msg = f"Delete directory {name} AND ALL ITS CONTENTS?"
-            if QMessageBox.question(self, "Recursive Delete", msg) == QMessageBox.Yes:
-                # Передаем текущее смещение, чтобы поиск шел в нужной таблице
+            if (
+                QMessageBox.question(self, "Recursive Delete", msg)
+                == QMessageBox.StandardButton.Yes
+            ):
                 self.fs.delete_directory(name, offset=self.current_dir_offset)
                 self.update_list()
         else:
